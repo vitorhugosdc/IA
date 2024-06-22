@@ -27,10 +27,16 @@ public class IAProgramadaPelaEquipeVitor_ra116426 implements AI {
 
         for (int i = 1; i < 25; i++) {
             int numCheckers = bs.getPoint(player, i);
+            int opponentCheckers = bs.getPoint(opponent, i);
+
             if (numCheckers == 1) {
-                evaluation -= 50.0;
-            } else if (numCheckers > 1) {
-                evaluation += 10.0 * numCheckers;
+                evaluation -= 100.0;
+            } else if (numCheckers >= 2) {
+                evaluation += 50.0 * numCheckers;
+            }
+
+            if (opponentCheckers == 1) {
+                evaluation += 80.0;
             }
         }
 
@@ -39,18 +45,22 @@ public class IAProgramadaPelaEquipeVitor_ra116426 implements AI {
             evaluation += i * numCheckers;
         }
 
-        for (int i = 1; i < 25; i++) {
-            int opponentCheckers = bs.getPoint(opponent, i);
-            if (opponentCheckers == 1) {
-                evaluation += 75.0;
-            }
-        }
-
         int baseCheckers = bs.getPoint(player, 0);
-        evaluation -= baseCheckers * 50.0;
+        evaluation -= baseCheckers * 40.0;
 
         int offBoardCheckers = bs.getPoint(player, 25);
-        evaluation += offBoardCheckers * 25.0;
+        evaluation += offBoardCheckers * 100.0;
+
+        for (int i = 19; i < 25; i++) {
+            int numCheckers = bs.getPoint(player, i);
+            evaluation += 100.0 * numCheckers;
+        }
+
+        // Verificar peças adversárias capturadas
+        int opponentCaptured = bs.getPoint(opponent, 0);
+        if (opponentCaptured > 0) {
+            evaluation += 150.0 * opponentCaptured;
+        }
 
         return evaluation;
     }
@@ -79,10 +89,19 @@ public class IAProgramadaPelaEquipeVitor_ra116426 implements AI {
     }
 
     public int rollOrDouble(BoardSetup boardSetup) throws CannotDecideException {
+        double eval = heuristic(boardSetup);
+        if (boardSetup.mayDouble(boardSetup.getPlayerAtMove())) {
+            if (eval >= 200.0)
+                return DOUBLE;
+        }
         return ROLL;
     }
 
     public int takeOrDrop(BoardSetup boardSetup) throws CannotDecideException {
-        return TAKE;
+        double eval = heuristic(boardSetup);
+        if (eval > -100.0)
+            return TAKE;
+        else
+            return DROP;
     }
 }
