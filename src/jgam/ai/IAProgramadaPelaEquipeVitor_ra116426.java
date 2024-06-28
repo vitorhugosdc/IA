@@ -27,40 +27,25 @@ public class IAProgramadaPelaEquipeVitor_ra116426 implements AI {
 
         for (int i = 1; i < 25; i++) {
             int numCheckers = bs.getPoint(player, i);
-            int opponentCheckers = bs.getPoint(opponent, i);
+            int opponentNumCheckers = bs.getPoint(opponent, i);
 
-            if (numCheckers == 1) {
-                evaluation -= 100.0;
-            } else if (numCheckers >= 2) {
-                evaluation += 50.0 * numCheckers;
+            if (opponentNumCheckers == 1) {
+                evaluation += 75.0;
             }
 
-            if (opponentCheckers == 1) {
-                evaluation += 80.0;
+            if (numCheckers == 2) {
+                evaluation += 100.0;
+            } else if (numCheckers == 1) {
+                evaluation -= 75.0;
+            } else {
+                evaluation -= 25.0 * numCheckers;
             }
+
+            evaluation += i * 1.5 * numCheckers;
         }
 
-        for (int i = 1; i < 25; i++) {
-            int numCheckers = bs.getPoint(player, i);
-            evaluation += i * numCheckers;
-        }
-
-        int baseCheckers = bs.getPoint(player, 0);
-        evaluation -= baseCheckers * 40.0;
-
-        int offBoardCheckers = bs.getPoint(player, 25);
-        evaluation += offBoardCheckers * 100.0;
-
-        for (int i = 19; i < 25; i++) {
-            int numCheckers = bs.getPoint(player, i);
-            evaluation += 100.0 * numCheckers;
-        }
-
-        // Verificar peças adversárias capturadas
-        int opponentCaptured = bs.getPoint(opponent, 0);
-        if (opponentCaptured > 0) {
-            evaluation += 150.0 * opponentCaptured;
-        }
+        int playerHomeCheckers = bs.getPoint(player, 25);
+        evaluation += 50.0 * playerHomeCheckers;
 
         return evaluation;
     }
@@ -70,11 +55,11 @@ public class IAProgramadaPelaEquipeVitor_ra116426 implements AI {
         int decision = -1;
 
         PossibleMoves pm = new PossibleMoves(bs);
-        List moveList = pm.getPossbibleNextSetups();
+        List<BoardSetup> moveList = pm.getPossbibleNextSetups();
 
         int i = 0;
-        for (Iterator iter = moveList.iterator(); iter.hasNext(); i++) {
-            BoardSetup boardSetup = (BoardSetup) iter.next();
+        for (Iterator<BoardSetup> iter = moveList.iterator(); iter.hasNext(); i++) {
+            BoardSetup boardSetup = iter.next();
             double thisEvaluation = heuristic(boardSetup);
             if (thisEvaluation > evaluation) {
                 evaluation = thisEvaluation;
@@ -82,26 +67,26 @@ public class IAProgramadaPelaEquipeVitor_ra116426 implements AI {
             }
         }
 
-        if (decision == -1)
+        if (decision == -1) {
             return new SingleMove[0];
-        else
+        } else {
             return pm.getMoveChain(decision);
+        }
     }
 
     public int rollOrDouble(BoardSetup boardSetup) throws CannotDecideException {
-        double eval = heuristic(boardSetup);
-        if (boardSetup.mayDouble(boardSetup.getPlayerAtMove())) {
-            if (eval >= 200.0)
-                return DOUBLE;
+        if (boardSetup.getPoint(3 - boardSetup.getPlayerAtMove(), 25) < boardSetup.getPoint(boardSetup.getPlayerAtMove(), 25) / 2) {
+            return DOUBLE;
+        } else {
+            return ROLL;
         }
-        return ROLL;
     }
 
     public int takeOrDrop(BoardSetup boardSetup) throws CannotDecideException {
-        double eval = heuristic(boardSetup);
-        if (eval > -100.0)
-            return TAKE;
-        else
+        if (boardSetup.getPoint(3 - boardSetup.getPlayerAtMove(), 25) > boardSetup.getPoint(boardSetup.getPlayerAtMove(), 25) * 2) {
             return DROP;
+        } else {
+            return TAKE;
+        }
     }
 }
