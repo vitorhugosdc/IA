@@ -23,28 +23,26 @@
  */
 
 
-
 package jgam.game;
 
-import java.io.*;
+import jgam.JGammon;
+import jgam.ai.AIPlayer;
+import jgam.gui.UIObject;
+import jgam.history.History;
+import jgam.net.JGamProtocolException;
+import jgam.util.BlockingQueue;
 
-import jgam.*;
-import jgam.gui.*;
-import jgam.history.*;
-import jgam.util.*;
+import java.io.IOException;
+import java.io.PrintWriter;
 
 /**
  * This is the game itsself - the logic etc.
  * The players are contained in here as well.
- *
  * After construction a game is started by the start()-method.
  * It then runs in its own thread.
- *
  * After finding out the beginning party, the players take turns.
  * (method play()).
- *
  * A game can be stopped via the abort-method.
- *
  * Many methods are available both for Player and for int arguments.
  * Player was first. Introducing the BoardSetup led to the int-versions.
  *
@@ -114,13 +112,15 @@ public class Game {
     public final static int STATE_WAIT_FOR_DOUBLE_ANSWER = 3;
     public final static int STATE_WAIT_FOR_DICES = 4;
 
+    /*delay para computer vs computer*/
+    private int delay;
 
     /**
      * construct a new Game Object.
      * @param diceRoller DiceRoller
-     * @param p1 Player
-     * @param p2 Player
-     * @param jgam JGammon
+     * @param p1         Player
+     * @param p2         Player
+     * @param jgam       JGammon
      * @throws JGamProtocolException
      * @throws IOException
      */
@@ -218,20 +218,20 @@ public class Game {
 
             while (state != STATE_GAME_OVER) {
                 switch (state) {
-                case STATE_AT_MOVE:
-                    atMove();
-                    break;
-                case STATE_AT_DECISION:
-                    atDecision();
-                    break;
-                case STATE_WAIT_FOR_DOUBLE_ANSWER:
-                    atWaitForDoubleAnswer();
-                    break;
-                case STATE_WAIT_FOR_DICES:
-                    atAwaitDices();
-                    break;
-                default:
-                    throw new IllegalStateException("Unknown state: " + state);
+                    case STATE_AT_MOVE:
+                        atMove();
+                        break;
+                    case STATE_AT_DECISION:
+                        atDecision();
+                        break;
+                    case STATE_WAIT_FOR_DOUBLE_ANSWER:
+                        atWaitForDoubleAnswer();
+                        break;
+                    case STATE_WAIT_FOR_DICES:
+                        atAwaitDices();
+                        break;
+                    default:
+                        throw new IllegalStateException("Unknown state: " + state);
                 }
             }
 
@@ -251,7 +251,7 @@ public class Game {
         } finally {
             player1.dispose();
             player2.dispose();
-            if(diceLogger != null)
+            if (diceLogger != null)
                 diceLogger.close();
         }
     }
@@ -300,41 +300,44 @@ public class Game {
 
         switch (pm.getMessage()) {
 
-        case PlayerMessage.MOVE:
-            if (pm.getOwner() != getCurrentPlayer()) {
-                throw new IllegalStateException("Only the current player may 'move': " + pm);
-            }
-            Move move = (Move) pm.getObject();
-            gameBoard.performMove(move);
-            history.addMove(move);
-            informPlayers(pm);
+            case PlayerMessage.MOVE:
+                if (pm.getOwner() instanceof AIPlayer) {
+                    Thread.sleep(getDelay()); /* Adiciona o delay antes da jogada da IA */
+                }
+                if (pm.getOwner() != getCurrentPlayer()) {
+                    throw new IllegalStateException("Only the current player may 'move': " + pm);
+                }
+                Move move = (Move) pm.getObject();
+                gameBoard.performMove(move);
+                history.addMove(move);
+                informPlayers(pm);
 
-            break;
+                break;
 
-        case PlayerMessage.UNDO:
-            if (pm.getOwner() != currentPlayer) {
-                throw new IllegalStateException("Only the current player may 'undo': " + pm);
-            }
+            case PlayerMessage.UNDO:
+                if (pm.getOwner() != currentPlayer) {
+                    throw new IllegalStateException("Only the current player may 'undo': " + pm);
+                }
 
-            /** @todo   if(!undoPlayer.wantsUndo()) throw new IllegalStateException("No undo wanted! "+pm); */
-            gameBoard.applySetup(undoSetup);
-            history.addUndo();
-            informPlayers(pm);
-            break;
+                /** @todo if(! undoPlayer.wantsUndo ()) throw new IllegalStateException("No undo wanted! "+pm); */
+                gameBoard.applySetup(undoSetup);
+                history.addUndo();
+                informPlayers(pm);
+                break;
 
-        case PlayerMessage.GIVEUP_TAKEN:
-            winner = pm.getOwner();
-            Player loser = getOtherPlayer(winner);
-            wintype = pm.getValue();
+            case PlayerMessage.GIVEUP_TAKEN:
+                winner = pm.getOwner();
+                Player loser = getOtherPlayer(winner);
+                wintype = pm.getValue();
 
-            /** @todo if(!loser.wantsGiveup()) throw new IllegalStateException("unwanted giveup!" + pm); */
-            /** @todo history */
-            setState(STATE_GAME_OVER);
-            informPlayers(pm);
-            break;
+                /** @todo if(! loser.wantsGiveup ()) throw new IllegalStateException("unwanted giveup!" + pm); */
+                /** @todo history */
+                setState(STATE_GAME_OVER);
+                informPlayers(pm);
+                break;
 
-        default:
-            throw new IllegalStateException("Unexpected Message " + pm);
+            default:
+                throw new IllegalStateException("Unexpected Message " + pm);
         }
     }
 
@@ -358,42 +361,42 @@ public class Game {
 
         switch (pm.getMessage()) {
 
-        case PlayerMessage.DOUBLE_TAKEN:
-            if (pm.getOwner() != getOtherPlayer()) {
-                throw new IllegalStateException("Only the other player may 'take': " + pm);
-            }
-            gameBoard.doubleCube.doubling(getCurrentPlayer().getNumber());
-            gameBoard.clearDices();
-            history.addDoubleAnswer(pm.getOwner(), true);
-            undoSetup = null;
-            informPlayers(pm);
-            setState(STATE_AT_DECISION);
-            break;
+            case PlayerMessage.DOUBLE_TAKEN:
+                if (pm.getOwner() != getOtherPlayer()) {
+                    throw new IllegalStateException("Only the other player may 'take': " + pm);
+                }
+                gameBoard.doubleCube.doubling(getCurrentPlayer().getNumber());
+                gameBoard.clearDices();
+                history.addDoubleAnswer(pm.getOwner(), true);
+                undoSetup = null;
+                informPlayers(pm);
+                setState(STATE_AT_DECISION);
+                break;
 
-        case PlayerMessage.DOUBLE_DROPPED:
-            if (pm.getOwner() != getOtherPlayer()) {
-                throw new IllegalStateException("Only the other player may 'drop': " + pm);
-            }
-            winner = currentPlayer;
-            wintype = WINTYPE_NORMAL;
-            history.addDoubleAnswer(pm.getOwner(), false);
-            setState(STATE_GAME_OVER);
-            informPlayers(pm);
-            break;
+            case PlayerMessage.DOUBLE_DROPPED:
+                if (pm.getOwner() != getOtherPlayer()) {
+                    throw new IllegalStateException("Only the other player may 'drop': " + pm);
+                }
+                winner = currentPlayer;
+                wintype = WINTYPE_NORMAL;
+                history.addDoubleAnswer(pm.getOwner(), false);
+                setState(STATE_GAME_OVER);
+                informPlayers(pm);
+                break;
 
-        case PlayerMessage.GIVEUP_TAKEN:
-            winner = pm.getOwner();
-            Player loser = getOtherPlayer(winner);
-            wintype = pm.getValue();
+            case PlayerMessage.GIVEUP_TAKEN:
+                winner = pm.getOwner();
+                Player loser = getOtherPlayer(winner);
+                wintype = pm.getValue();
 
-            /** @todo if(!loser.wantsGiveup()) throw new IllegalStateException("unwanted giveup!" + pm); */
-            history.addGiveup(pm.getOwner(), wintype);
-            setState(STATE_GAME_OVER);
-            informPlayers(pm);
-            break;
+                /** @todo if(! loser.wantsGiveup ()) throw new IllegalStateException("unwanted giveup!" + pm); */
+                history.addGiveup(pm.getOwner(), wintype);
+                setState(STATE_GAME_OVER);
+                informPlayers(pm);
+                break;
 
-        default:
-            throw new IllegalStateException("Unexpected Message " + pm);
+            default:
+                throw new IllegalStateException("Unexpected Message " + pm);
         }
     }
 
@@ -418,57 +421,57 @@ public class Game {
         PlayerMessage pm = receiveMessage();
 
         switch (pm.getMessage()) {
-        case PlayerMessage.UNDO:
-            if (pm.getOwner() != currentPlayer) {
-                throw new IllegalStateException("Only the undo player may 'undo': " + pm);
-            }
-            if (undoSetup == null) {
-                throw new IllegalStateException("No situation to undo anything");
-            }
+            case PlayerMessage.UNDO:
+                if (pm.getOwner() != currentPlayer) {
+                    throw new IllegalStateException("Only the undo player may 'undo': " + pm);
+                }
+                if (undoSetup == null) {
+                    throw new IllegalStateException("No situation to undo anything");
+                }
 
-            /** @todo   if(!undoPlayer.wantsUndo()) throw new IllegalStateException("No undo wanted! "+pm); */
-            /** @todo history */
-            gameBoard.applySetup(undoSetup);
-            snapshot = undoSetup;
-            currentPlayer = undoPlayer;
-            setState(STATE_AT_MOVE);
-            informPlayers(pm);
-            break;
+                /** @todo if(! undoPlayer.wantsUndo ()) throw new IllegalStateException("No undo wanted! "+pm); */
+                /** @todo history */
+                gameBoard.applySetup(undoSetup);
+                snapshot = undoSetup;
+                currentPlayer = undoPlayer;
+                setState(STATE_AT_MOVE);
+                informPlayers(pm);
+                break;
 
-        case PlayerMessage.DOUBLE:
-            if (pm.getOwner() != currentPlayer) {
-                throw new IllegalStateException("Only the current player may 'double': " + pm);
-            }
-            if (!gameBoard.mayDouble(currentPlayer.getNumber())) {
-                throw new IllegalArgumentException("current player may not double! " + pm);
-            }
-            history.addDoubleProposal(pm.getOwner(), gameBoard.getDoubleCube()*2);
-            setState(STATE_WAIT_FOR_DOUBLE_ANSWER);
-            informPlayers(pm);
-            break;
+            case PlayerMessage.DOUBLE:
+                if (pm.getOwner() != currentPlayer) {
+                    throw new IllegalStateException("Only the current player may 'double': " + pm);
+                }
+                if (!gameBoard.mayDouble(currentPlayer.getNumber())) {
+                    throw new IllegalArgumentException("current player may not double! " + pm);
+                }
+                history.addDoubleProposal(pm.getOwner(), gameBoard.getDoubleCube() * 2);
+                setState(STATE_WAIT_FOR_DOUBLE_ANSWER);
+                informPlayers(pm);
+                break;
 
-        case PlayerMessage.ROLL:
-            if (pm.getOwner() != currentPlayer) {
-                throw new IllegalStateException("Only the current player may 'roll': " + pm);
-            }
-            diceRoller.rollDices(this);
-            informPlayers(pm);
-            setState(STATE_WAIT_FOR_DICES);
-            break;
+            case PlayerMessage.ROLL:
+                if (pm.getOwner() != currentPlayer) {
+                    throw new IllegalStateException("Only the current player may 'roll': " + pm);
+                }
+                diceRoller.rollDices(this);
+                informPlayers(pm);
+                setState(STATE_WAIT_FOR_DICES);
+                break;
 
-        case PlayerMessage.GIVEUP_TAKEN:
-            winner = pm.getOwner();
-            Player loser = getOtherPlayer(winner);
-            wintype = pm.getValue();
+            case PlayerMessage.GIVEUP_TAKEN:
+                winner = pm.getOwner();
+                Player loser = getOtherPlayer(winner);
+                wintype = pm.getValue();
 
-            /** @todo if(!loser.wantsGiveup()) throw new IllegalStateException("unwanted giveup!" + pm); */
-            history.addGiveup(pm.getOwner(), wintype);
-            setState(STATE_GAME_OVER);
-            informPlayers(pm);
-            break;
+                /** @todo if(! loser.wantsGiveup ()) throw new IllegalStateException("unwanted giveup!" + pm); */
+                history.addGiveup(pm.getOwner(), wintype);
+                setState(STATE_GAME_OVER);
+                informPlayers(pm);
+                break;
 
-        default:
-            throw new IllegalStateException("Unexpected Message " + pm);
+            default:
+                throw new IllegalStateException("Unexpected Message " + pm);
         }
 
     }
@@ -481,31 +484,31 @@ public class Game {
 
         switch (pm.getMessage()) {
 
-        case PlayerMessage.DICES:
-            int[] dice = (int[]) pm.getObject();
-            gameBoard.setDice(dice);
-            snapshot = undoSetup = new BoardSnapshot(gameBoard);
-            undoPlayer = getCurrentPlayer();
-            history.addRoll(getCurrentPlayer(), gameBoard.getDice());
-            logDices();
-            pm.setOwner(getCurrentPlayer());
-            informPlayers(pm);
-            setState(STATE_AT_MOVE);
-            break;
+            case PlayerMessage.DICES:
+                int[] dice = (int[]) pm.getObject();
+                gameBoard.setDice(dice);
+                snapshot = undoSetup = new BoardSnapshot(gameBoard);
+                undoPlayer = getCurrentPlayer();
+                history.addRoll(getCurrentPlayer(), gameBoard.getDice());
+                logDices();
+                pm.setOwner(getCurrentPlayer());
+                informPlayers(pm);
+                setState(STATE_AT_MOVE);
+                break;
 
-        case PlayerMessage.GIVEUP_TAKEN:
-            winner = pm.getOwner();
-            Player loser = getOtherPlayer(winner);
-            wintype = pm.getValue();
+            case PlayerMessage.GIVEUP_TAKEN:
+                winner = pm.getOwner();
+                Player loser = getOtherPlayer(winner);
+                wintype = pm.getValue();
 
-            /** @todo if(!loser.wantsGiveup()) throw new IllegalStateException("unwanted giveup!" + pm); */
-            history.addGiveup(pm.getOwner(), wintype);
-            setState(STATE_GAME_OVER);
-            informPlayers(pm);
-            break;
+                /** @todo if(! loser.wantsGiveup ()) throw new IllegalStateException("unwanted giveup!" + pm); */
+                history.addGiveup(pm.getOwner(), wintype);
+                setState(STATE_GAME_OVER);
+                informPlayers(pm);
+                break;
 
-        default:
-            throw new IllegalStateException("Unexpected Message " + pm);
+            default:
+                throw new IllegalStateException("Unexpected Message " + pm);
         }
 
     }
@@ -514,16 +517,16 @@ public class Game {
      * log dices to diceLogger
      */
     private void logDices() {
-        if(diceLogger != null) {
+        if (diceLogger != null) {
             int[] dices = gameBoard.getDice();
-            diceLogger.println(""+dices[0]+","+dices[1]);
+            diceLogger.println("" + dices[0] + "," + dices[1]);
         }
     }
 
 
     /**
      * take a message from the messageQueue.
-     *
+     * <p>
      * check for ABNORMAL_ERROR
      *
      * @return message read from the queue
@@ -637,11 +640,19 @@ public class Game {
         this.state = state;
     }
 
+    public void setDelay(int delay) {
+        this.delay = delay;
+    }
+
+    public int getDelay() {
+        return delay;
+    }
+
     /**
      * is there a game alive?
      *
-     * @throws NullPointerException if thread is null
      * @return boolean
+     * @throws NullPointerException if thread is null
      */
     public boolean isRunning() {
         return gameThread.isAlive();
@@ -669,5 +680,4 @@ public class Game {
     public History getHistory() {
         return history;
     }
-
 }

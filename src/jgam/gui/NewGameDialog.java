@@ -54,7 +54,7 @@ import jgam.util.*;
 public class NewGameDialog extends JDialog {
     private JPanel panel1 = new JPanel();
     private ResourceBundle msg = JGammon.getResources(
-                                 "jgam.msg.NewGameDialog");
+            "jgam.msg.NewGameDialog");
     private JRadioButton RBlocal = new JRadioButton();
     private GridBagLayout gridBagLayout1 = new GridBagLayout();
     private JRadioButton RBnetwork = new JRadioButton();
@@ -83,15 +83,15 @@ public class NewGameDialog extends JDialog {
     private JTextField locName = new JTextField();
 
     private ImageIcon local = new ImageIcon(NewGameDialog.class.getResource(
-                              "/jgam/img/local.gif"));
+            "/jgam/img/local.gif"));
     private ImageIcon networkIcon = new ImageIcon(NewGameDialog.class.
-                                    getResource(
-                                    "/jgam/img/network.gif"));
+            getResource(
+                    "/jgam/img/network.gif"));
     private ImageIcon aiIcon = new ImageIcon(NewGameDialog.class.
-                               getResource(
-                               "/jgam/img/computer.gif"));
+            getResource(
+                    "/jgam/img/computer.gif"));
     private ImageIcon openIcon = new ImageIcon(NewGameDialog.class.getResource(
-                                 "/jgam/img/open.gif"));
+            "/jgam/img/open.gif"));
 
     private boolean okPressed = false;
     private JGammon jgam;
@@ -103,6 +103,10 @@ public class NewGameDialog extends JDialog {
 
     private java.util.List<Game> game;
     private JGammonConnection gameConnection;
+
+    /*Delay em computer vs computer*/
+    private JLabel delayLabel = new JLabel("Delay (ms):");
+    private JTextField delayField = new JTextField("1000"); // Default delay of 1000 ms
 
     public NewGameDialog(JGammon jgam) {
         super(jgam.getFrame(), true);
@@ -207,6 +211,12 @@ public class NewGameDialog extends JDialog {
         remoteGroup.add(RBclient);
         remoteGroup.add(RBserver);
         this.getContentPane().add(panel1, java.awt.BorderLayout.CENTER);
+
+        /*os 2 primeiros são para o botão de delay*/
+        panel1.add(delayLabel, new GridBagConstraints(2, 15, 2, 1, 0.0, 0.0,
+                GridBagConstraints.EAST, GridBagConstraints.NONE, new Insets(0, 0, 0, 7), 0, 0));
+        panel1.add(delayField, new GridBagConstraints(4, 15, 1, 1, 0.0, 0.0,
+                GridBagConstraints.CENTER, GridBagConstraints.BOTH, new Insets(0, 0, 0, 20), 0, 0));
         panel1.add(RBlocal, new GridBagConstraints(1, 0, 4, 1, 0.0, 0.0
                 , GridBagConstraints.CENTER, GridBagConstraints.BOTH, new Insets(20, 0, 0, 0), 2, 0));
         panel1.add(component1, new GridBagConstraints(1, 6, 1, 1, 0.0, 0.0
@@ -341,11 +351,14 @@ public class NewGameDialog extends JDialog {
                     AI pSelec = selectAI();
                     AI sSelec = selectAI();
 
+                    int delay = Integer.parseInt(delayField.getText());
+
                     int nJgs = Integer.parseInt(JOptionPane.showInputDialog(null, "Digite o numero de jogos:"));
 
                     if (pSelec != null && sSelec != null) {
                         for (int i = 0; i < nJgs; i++) {
                             tempGame = new Game(new LocalDiceRoller(), new AIPlayer(pSelec), new AIPlayer(sSelec), jgam);
+                            tempGame.setDelay(delay);
                             game.add(tempGame);
                         }
                         return  true;
@@ -358,8 +371,8 @@ public class NewGameDialog extends JDialog {
                                 JOptionPane.ERROR_MESSAGE);
                     } else if (RBclient.isSelected()) {
                         gameConnection = new JGammonConnection(server.getText(),
-                                         Integer.parseInt(port.getText()),
-                                         locName.getText());
+                                Integer.parseInt(port.getText()),
+                                locName.getText());
                         Player locPlayer = new UIPlayer(locName.getText(), jgam);
                         Player remPlayer = new JGammonNetPlayer(gameConnection);
                         tempGame = new Game(gameConnection, remPlayer, locPlayer, jgam);
@@ -379,8 +392,8 @@ public class NewGameDialog extends JDialog {
                         window.asyncShow();
                         try {
                             gameConnection = new JGammonConnection(Integer.parseInt(port.getText()),
-                                             locName.getText(),
-                                             snapshot, window);
+                                    locName.getText(),
+                                    snapshot, window);
                         } finally {
                             window.dispose();
                         }
@@ -428,9 +441,9 @@ public class NewGameDialog extends JDialog {
         }
 
         Object desc = JOptionPane.showInputDialog(this,
-                      "Please choose the AI implementation to play against",
-                      "Choose computer player",
-                      JOptionPane.QUESTION_MESSAGE, aiIcon, descs.toArray(), descs.get(0));
+                "Please choose the AI implementation to play against",
+                "Choose computer player",
+                JOptionPane.QUESTION_MESSAGE, aiIcon, descs.toArray(), descs.get(0));
 
         if (desc == null) {
             return null;
@@ -485,7 +498,7 @@ public class NewGameDialog extends JDialog {
      */
 
     public void feed(String mode, String portArg, String serverArg,
-            String name1Arg, String name2Arg, String boardFileArg) {
+                     String name1Arg, String name2Arg, String boardFileArg) {
         if (mode.equals("local")) {
             RBlocal.setSelected(true);
         } else if (mode.equals("client")) {
@@ -570,5 +583,4 @@ public class NewGameDialog extends JDialog {
                 msg.getString("serverListening"),
                 msg.getString("abort"));
     }
-
 }
